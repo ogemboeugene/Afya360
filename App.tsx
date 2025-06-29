@@ -1,28 +1,41 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
+ * Afya360 Health App
+ * Main application entry point - Pure React Native (no react-navigation)
  *
  * @format
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import React from 'react';
+import { StatusBar, useColorScheme, View, Platform } from 'react-native';
+import { AuthProvider } from './src/context/AuthContextSimple';
+import AppNavigator from './src/navigation/AppNavigator';
+import { COLORS } from './src/styles/colors';
 
-function App() {
+console.log('🔍 App.tsx: File loaded - pure React Native app (no react-navigation)');
+
+function App(): React.JSX.Element {
+  console.log('🔍 App: Function component called');
+  
   const isDarkMode = useColorScheme() === 'dark';
 
+  console.log('🔍 App component rendering, isDarkMode:', isDarkMode);
+
+  console.log('🔍 App: About to render pure React Native navigation');
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <NewAppScreen templateFileName="App.tsx" />
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: COLORS.white,
+    }}>
+      <AuthProvider>
+        <StatusBar 
+          barStyle={isDarkMode ? 'light-content' : 'dark-content'} 
+          backgroundColor={COLORS.primary500}
+        />
+        <AppNavigator />
+      </AuthProvider>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;

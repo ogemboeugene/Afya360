@@ -1,8 +1,133 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Afya360 - Comprehensive Kenya Healthcare App
+
+A modern, comprehensive healthcare mobile application built with React Native and Expo, designed specifically for the Kenyan healthcare ecosystem.
+
+## Project Overview
+
+Afya360 is a comprehensive healthcare management app that provides users with:
+- Digital health records management
+- Medication tracking and reminders
+- Healthcare provider directory and appointment booking
+- Emergency services and contacts
+- Insurance management and billing
+- Health facilities finder
+- Prescription scanning and drug interaction checking
+
+## Technology Stack
+
+- **Framework**: React Native with Expo
+- **Language**: TypeScript
+- **Navigation**: React Navigation v6
+- **State Management**: React Context API
+- **Storage**: Expo SecureStore & AsyncStorage
+- **Camera**: Expo Camera & Document Picker
+- **Location**: Expo Location
+- **Notifications**: Expo Notifications
+- **Icons**: Expo Vector Icons
+- **Authentication**: Biometric & PIN-based security
+
+## Project Structure
+
+```
+src/
+├── assets/                 # Static assets (images, icons)
+├── components/            # Reusable UI components
+│   ├── ui/               # Basic UI components (buttons, inputs)
+│   ├── forms/            # Form components
+│   ├── cards/            # Card components for data display
+│   ├── modals/           # Modal and overlay components
+│   └── common/           # Common components (logo, headers)
+├── screens/              # Screen components organized by feature
+│   ├── onboarding/       # App onboarding flow
+│   ├── auth/             # Authentication screens
+│   ├── dashboard/        # Main dashboard and home
+│   ├── health/           # Health records management
+│   ├── medications/      # Medication management
+│   ├── providers/        # Healthcare providers
+│   ├── emergency/        # Emergency services
+│   ├── facilities/       # Healthcare facilities
+│   ├── insurance/        # Insurance management
+│   └── profile/          # User profile management
+├── navigation/           # Navigation configuration
+├── services/             # External services and APIs
+│   ├── api/              # API client and endpoints
+│   ├── storage/          # Local storage services
+│   ├── notifications/    # Notification services
+│   ├── location/         # Location services
+│   └── camera/           # Camera and scanning services
+├── hooks/                # Custom React hooks
+├── context/              # React Context providers
+├── data/                 # Data schemas and mock data
+├── utils/                # Utility functions
+├── styles/               # Global styles and theming
+├── types/                # TypeScript type definitions
+└── constants/            # App-wide constants
+```
 
 # Getting Started
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+> **Note**: Make sure you have completed the [React Native Development Environment](https://reactnative.dev/docs/set-up-your-environment) setup and have Expo CLI installed globally (`npm install -g @expo/cli`).
+
+## Prerequisites
+
+- Node.js (v16 or higher)
+- npm or yarn
+- Expo CLI (`npm install -g @expo/cli`)
+- Android Studio (for Android development)
+- Xcode (for iOS development, macOS only)
+
+## Installation
+
+1. Clone the repository and navigate to project directory
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   expo start
+   ```
+4. Run on device/simulator:
+   - Press `i` for iOS simulator
+   - Press `a` for Android emulator
+   - Scan QR code with Expo Go app for physical device
+
+## Development Guidelines
+
+### File Naming Conventions
+
+- **Components**: PascalCase (e.g., `LoginScreen.tsx`, `PrimaryButton.tsx`)
+- **Files**: camelCase (e.g., `apiClient.ts`, `storageService.ts`)
+- **Directories**: camelCase (e.g., `components`, `services`)
+
+### Implementation Priority
+
+The project structure is complete with placeholder files. Implement in this order:
+
+1. **Core Setup**: Complete types, constants, and styles
+2. **Authentication Flow**: Implement auth context and screens
+3. **Navigation**: Complete app navigator with all routes
+4. **Core UI Components**: Build reusable components
+5. **Feature Screens**: Implement each screen with detailed instructions
+6. **Services Integration**: Add API client and external services
+
+### Key Features to Implement
+
+- Phone verification with OTP
+- Biometric authentication
+- Health records management
+- Medication tracking and scanning
+- Provider directory and appointments
+- Emergency services
+- Insurance management
+
+## Environment Configuration
+
+Create `.env` file with:
+```
+EXPO_PUBLIC_API_BASE_URL=https://api.afya360.co.ke
+EXPO_PUBLIC_ENVIRONMENT=development
+```
 
 ## Step 1: Start Metro
 
