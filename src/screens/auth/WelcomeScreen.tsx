@@ -16,64 +16,72 @@ import {
   Platform,
 } from 'react-native';
 // import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import IconFA from 'react-native-vector-icons/FontAwesome5';
 
 // Import components
-import { Afya360Logo } from '../../components/common/Afya360Logo';
 import Button from '../../components/ui/buttons/Button';
 
 // Import styles
 import { COLORS } from '../../styles/colors';
 import { TEXT_STYLES } from '../../styles/globalStyles';
 
-// Types
-import { RootStackParamList } from '../../types';
+// Types - simplified to match working screens
+type NavigationProp = {
+  navigate: (screen: string, params?: any) => void;
+  goBack: () => void;
+};
 
-type WelcomeScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  'Welcome'
->;
-
-type WelcomeScreenRouteProp = RouteProp<
-  RootStackParamList,
-  'Welcome'
->;
+type RouteProp = {
+  params?: any;
+};
 
 interface Props {
-  navigation: WelcomeScreenNavigationProp;
-  route?: WelcomeScreenRouteProp;
+  navigation: NavigationProp;
+  route?: RouteProp;
 }
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   const [autoAdvanceTimer, setAutoAdvanceTimer] = useState<NodeJS.Timeout | null>(null);
-  const fadeAnim = new Animated.Value(0);
-  const slideAnim = new Animated.Value(50);
+  const fadeAnim = new Animated.Value(1); // Start visible
+  const slideAnim = new Animated.Value(0); // Start in position
+  const scaleAnim = new Animated.Value(1); // Start at full scale
 
   useEffect(() => {
-    // Start animations
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    console.log('🔍 WelcomeScreen: Starting animations');
+    
+    // Start with immediate visibility, then animate
+    fadeAnim.setValue(1);
+    slideAnim.setValue(0);
+    scaleAnim.setValue(1);
+    
+    // Optional subtle animations
+    Animated.sequence([
+      Animated.delay(100),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ])
+    ]).start(() => {
+      console.log('🔍 WelcomeScreen: Animations completed');
+    });
 
-    // Auto-advance timer (3 seconds)
+    // Auto-advance timer (5 seconds - extended for better UX)
     const timer = setTimeout(() => {
+      console.log('🔍 WelcomeScreen: Auto-advancing to SignUp');
       handleGetStarted();
-    }, 3000);
+    }, 5000);
 
     setAutoAdvanceTimer(timer);
 
@@ -84,173 +92,172 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const handleGetStarted = () => {
+    console.log('🔍 WelcomeScreen: Get Started pressed');
     if (autoAdvanceTimer) {
       clearTimeout(autoAdvanceTimer);
     }
+    // Navigate to SignUp for new users
     navigation.navigate('SignUp');
   };
 
   const handleSignIn = () => {
+    console.log('🔍 WelcomeScreen: Sign In pressed');
     if (autoAdvanceTimer) {
       clearTimeout(autoAdvanceTimer);
     }
+    // Navigate to Login for existing users
     navigation.navigate('Login');
   };
 
-  const valueProp = [
-    {
-      icon: 'security',
-      iconLib: 'MaterialIcons',
-      title: 'Secure Records',
-      description: 'Bank-level encryption for your health data'
-    },
-    {
-      icon: 'pills',
-      iconLib: 'FontAwesome5',
-      title: 'Medication Tracking',
-      description: 'Never miss a dose with smart reminders'
-    },
-    {
-      icon: 'location-on',
-      iconLib: 'MaterialIcons',
-      title: 'Provider Directory',
-      description: 'Find healthcare providers near you'
-    }
-  ];
-
-  const renderValueProp = (item: any, index: number) => (
-    <Animated.View
-      key={index}
-      style={[
-        styles.valueCard,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }
-      ]}
-    >
-      <View style={styles.valueIconContainer}>
-        {item.iconLib === 'FontAwesome5' ? (
-          <IconFA name={item.icon} size={24} color={COLORS.primary500} />
-        ) : (
-          <Icon name={item.icon} size={24} color={COLORS.primary500} />
-        )}
-      </View>
-      <View style={styles.valueTextContainer}>
-        <Text style={styles.valueTitle}>{item.title}</Text>
-        <Text style={styles.valueDescription}>{item.description}</Text>
-      </View>
-    </Animated.View>
-  );
+  console.log('🔍 WelcomeScreen: Rendering...');
 
   return (
-    <LinearGradient
-      colors={['#2E86AB', '#E3F2FD']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <StatusBar backgroundColor="#2E86AB" barStyle="light-content" />
-      <View style={styles.safeArea}>
-        <TouchableOpacity 
-          style={styles.skipButton}
-          onPress={handleGetStarted}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar backgroundColor={COLORS.secondary600} barStyle="light-content" />
+      
+      {/* Background Gradient */}
+      <LinearGradient
+        colors={['#43A047', '#4CAF50', '#81C784']} // Green gradient - Healthcare theme
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      
+      {/* Skip Button */}
+      <TouchableOpacity 
+        style={styles.skipButton}
+        onPress={handleGetStarted}
+      >
+        <Text style={styles.skipText}>Skip</Text>
+      </TouchableOpacity>
 
-        <View style={styles.content}>
-          {/* Logo Section */}
-          <Animated.View 
-            style={[
-              styles.logoSection,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            <Afya360Logo 
-              variant="white"
-              size="extra-large"
-              animated={true}
-              style={styles.logo}
-            />
-            <Text style={styles.tagline}>Your Health, In Your Hands</Text>
-          </Animated.View>
-
-          {/* Value Propositions */}
-          <View style={styles.valuePropsContainer}>
-            {valueProp.map(renderValueProp)}
-          </View>
-
-          {/* Auto-advance indicator */}
-          <Animated.View style={[styles.autoAdvanceContainer, { opacity: fadeAnim }]}>
-            <View style={styles.dotsContainer}>
-              <View style={[styles.dot, styles.activeDot]} />
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-            </View>
-            <Text style={styles.autoAdvanceText}>Auto-advancing in 3 seconds</Text>
-          </Animated.View>
-        </View>
-
-        {/* Action Buttons */}
+      {/* Main Content - Fixed Layout */}
+      <View style={styles.mainContent}>
+        
+        {/* Logo Section */}
         <Animated.View 
           style={[
-            styles.actionContainer,
+            styles.logoSection,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: slideAnim },
+                { scale: scaleAnim }
+              ]
+            }
+          ]}
+        >
+          <View style={styles.logoPlaceholder}>
+            <Text style={styles.logoText}>Afya360</Text>
+          </View>
+          <Text style={styles.tagline}>Your Health, In Your Hands</Text>
+        </Animated.View>
+
+        {/* Key Features */}
+        <Animated.View 
+          style={[
+            styles.featuresSection,
+            { opacity: fadeAnim }
+          ]}
+        >
+          <View style={styles.featureRow}>
+            <View style={styles.featureItem}>
+              <Icon name="security" size={24} color={COLORS.white} />
+              <Text style={styles.featureText}>Secure</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Icon name="medical-services" size={24} color={COLORS.white} />
+              <Text style={styles.featureText}>Comprehensive</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Icon name="verified-user" size={24} color={COLORS.white} />
+              <Text style={styles.featureText}>Trusted</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Description */}
+        <Animated.View 
+          style={[
+            styles.descriptionSection,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }]
             }
           ]}
         >
-          <Button
-            title="Get Started"
-            onPress={handleGetStarted}
-            variant="primary"
-            style={styles.getStartedButton}
-            iconText="🚀"
-            iconPosition="left"
-          />
-
-          <TouchableOpacity
-            style={styles.signInButton}
-            onPress={handleSignIn}
-          >
-            <Text style={styles.signInText}>
-              Already have an account? <Text style={styles.signInLink}>Sign In</Text>
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.description}>
+            Manage your health records, medications, and appointments all in one secure place. 
+            HIPAA-compliant with bank-level encryption.
+          </Text>
         </Animated.View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Trusted by healthcare professionals worldwide
-          </Text>
-          <View style={styles.trustIndicators}>
-            <Icon name="verified" size={16} color={COLORS.white} />
-            <Text style={styles.trustText}>HIPAA Compliant</Text>
-            <Icon name="security" size={16} color={COLORS.white} />
-            <Text style={styles.trustText}>Secure</Text>
+        {/* Auto-advance indicator */}
+        <Animated.View style={[styles.progressSection, { opacity: fadeAnim }]}>
+          <View style={styles.dotsContainer}>
+            <View style={[styles.dot, styles.activeDot]} />
+            <View style={styles.dot} />
+            <View style={styles.dot} />
           </View>
-        </View>
+          <Text style={styles.progressText}>Starting automatically in 5 seconds</Text>
+        </Animated.View>
       </View>
-    </LinearGradient>
+
+      {/* Bottom Actions */}
+      <Animated.View 
+        style={[
+          styles.bottomSection,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
+        <Button
+          title="Get Started"
+          onPress={handleGetStarted}
+          variant="primary"
+          style={styles.getStartedButton}
+          iconText="🚀"
+          iconPosition="left"
+        />
+
+        <TouchableOpacity
+          style={styles.signInButton}
+          onPress={handleSignIn}
+        >
+          <Text style={styles.signInText}>
+            Already have an account? <Text style={styles.signInLink}>Sign In</Text>
+          </Text>
+        </TouchableOpacity>
+
+        {/* Trust Badge */}
+        <View style={styles.trustBadge}>
+          <Icon name="verified" size={14} color={COLORS.white} />
+          <Text style={styles.trustText}>HIPAA Compliant</Text>
+          <Icon name="security" size={14} color={COLORS.white} />
+          <Text style={styles.trustText}>Secure</Text>
+        </View>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#43A047', // Fallback color
   },
-  safeArea: {
-    flex: 1,
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   skipButton: {
     position: 'absolute',
-    top: 50,
+    top: Platform.OS === 'ios' ? 50 : 30,
     right: 20,
     zIndex: 10,
     paddingHorizontal: 16,
@@ -263,127 +270,143 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  content: {
+  mainContent: {
     flex: 1,
-    paddingHorizontal: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 80 : 60,
+    paddingBottom: 140, // Space for bottom section
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 60,
-  },
-  logo: {
-    marginBottom: 20,
-  },
-  tagline: {
-    ...TEXT_STYLES.h2,
-    color: COLORS.white,
-    textAlign: 'center',
-    fontWeight: '300',
-    letterSpacing: 0.5,
-  },
-  valuePropsContainer: {
-    width: '100%',
     marginBottom: 40,
   },
-  valueCard: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  valueIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary50,
+  logoPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 3,
+    borderColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 20,
   },
-  valueTextContainer: {
+  logoText: {
+    ...TEXT_STYLES.h2,
+    color: COLORS.white,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  appName: {
+    ...TEXT_STYLES.h1,
+    color: COLORS.white,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  tagline: {
+    ...TEXT_STYLES.h3,
+    color: COLORS.white,
+    fontWeight: '300',
+    opacity: 0.9,
+    textAlign: 'center',
+  },
+  featuresSection: {
+    marginBottom: 32,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    width: screenWidth * 0.8,
+  },
+  featureItem: {
+    alignItems: 'center',
     flex: 1,
   },
-  valueTitle: {
-    ...TEXT_STYLES.h3,
-    color: COLORS.gray900,
-    marginBottom: 4,
-    fontWeight: '600',
+  featureText: {
+    ...TEXT_STYLES.caption,
+    color: COLORS.white,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  valueDescription: {
+  descriptionSection: {
+    marginBottom: 32,
+    paddingHorizontal: 20,
+  },
+  description: {
     ...TEXT_STYLES.body,
-    color: COLORS.gray600,
-    lineHeight: 20,
+    color: COLORS.white,
+    textAlign: 'center',
+    opacity: 0.85,
+    lineHeight: 22,
+    fontSize: 16,
   },
-  autoAdvanceContainer: {
+  progressSection: {
     alignItems: 'center',
-    marginBottom: 20,
   },
   dotsContainer: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     marginHorizontal: 4,
   },
   activeDot: {
     backgroundColor: COLORS.white,
   },
-  autoAdvanceText: {
+  progressText: {
     ...TEXT_STYLES.caption,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: COLORS.white,
+    opacity: 0.8,
     textAlign: 'center',
   },
-  actionContainer: {
+  bottomSection: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    paddingTop: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   getStartedButton: {
-    marginBottom: 20,
-    shadowColor: COLORS.black,
+    marginBottom: 16,
+    shadowColor: COLORS.primary500,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   signInButton: {
     paddingVertical: 12,
     alignItems: 'center',
+    marginBottom: 16,
   },
   signInText: {
     ...TEXT_STYLES.body,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: COLORS.white,
     textAlign: 'center',
+    opacity: 0.9,
   },
   signInLink: {
     color: COLORS.white,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: 20,
-  },
-  footerText: {
-    ...TEXT_STYLES.caption,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  trustIndicators: {
+  trustBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   trustText: {
@@ -391,6 +414,9 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '500',
+    marginLeft: 4,
+    marginRight: 8,
+    opacity: 0.8,
   },
 });
 

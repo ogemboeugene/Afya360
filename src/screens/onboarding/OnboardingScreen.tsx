@@ -14,8 +14,6 @@ import {
   StatusBar,
 } from 'react-native';
 // import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
 
 // Import components
 import { Afya360Logo } from '../../components/common/Afya360Logo';
@@ -26,22 +24,19 @@ import Button from '../../components/ui/buttons/Button';
 import { COLORS } from '../../styles/colors';
 import { TEXT_STYLES } from '../../styles/globalStyles';
 
-// Types
-import { RootStackParamList } from '../../types';
+// Types - simplified to match working screens
+type NavigationProp = {
+  navigate: (screen: string, params?: any) => void;
+  goBack: () => void;
+};
 
-type OnboardingScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  'OnboardingWelcome'
->;
-
-type OnboardingScreenRouteProp = RouteProp<
-  RootStackParamList,
-  'OnboardingWelcome'
->;
+type RouteProp = {
+  params?: any;
+};
 
 interface Props {
-  navigation: OnboardingScreenNavigationProp;
-  route: OnboardingScreenRouteProp;
+  navigation: NavigationProp;
+  route: RouteProp;
 }
 
 export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {

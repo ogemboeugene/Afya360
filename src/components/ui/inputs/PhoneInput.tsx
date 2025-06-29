@@ -19,7 +19,7 @@ export interface PhoneInputProps extends Omit<TextInputProps, 'value' | 'onChang
   onChangeCountryCode?: (countryCode: string) => void;
   defaultCountryCode?: string;
   showCountryPicker?: boolean;
-  validatePhoneNumber?: boolean;
+  enableValidation?: boolean;
 }
 
 // Kenya and common country codes
@@ -46,7 +46,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   onChangeCountryCode,
   defaultCountryCode = '+254',
   showCountryPicker = true,
-  validatePhoneNumber = true,
+  enableValidation = true,
   label,
   errorText,
   placeholder = 'Enter phone number',
@@ -59,25 +59,78 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   // Use either onChangeCountryCode or onCountryCodeChange (for backward compatibility)
   const handleCountryCodeChange = onChangeCountryCode || onCountryCodeChange;
 
-  const validateKenyanPhone = (phone: string, code: string): boolean => {
-    if (code === '+254') {
-      // Remove any spaces, dashes, or special characters
-      const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-      // Kenyan mobile numbers: 7XX XXX XXX or 1XX XXX XXX
-      const kenyanMobileRegex = /^[71]\d{8}$/;
-      return kenyanMobileRegex.test(cleanPhone);
+  const validatePhoneNumber = (phone: string, code: string): boolean => {
+    // Remove any spaces, dashes, or special characters
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+    
+    // Basic validation - just check if it has digits and reasonable length
+    if (cleanPhone.length < 7 || cleanPhone.length > 15) {
+      return false;
     }
-    return true; // For other countries, we'll do basic validation
+    
+    // Country-specific validation (optional, more lenient)
+    if (code === '+254') {
+      // Kenyan mobile numbers: 7XX XXX XXX or 1XX XXX XXX, but also accept other formats
+      const kenyanMobileRegex = /^[71]\d{8}$/;
+      if (kenyanMobileRegex.test(cleanPhone)) {
+        return true;
+      }
+      // Accept other formats for Kenya too (international users)
+      return cleanPhone.length >= 7 && cleanPhone.length <= 12;
+    }
+    
+    if (code === '+1') {
+      // US/Canada: 10 digits
+      return cleanPhone.length === 10;
+    }
+    
+    if (code === '+44') {
+      // UK: 10-11 digits
+      return cleanPhone.length >= 10 && cleanPhone.length <= 11;
+    }
+    
+    // For other countries, accept any reasonable length
+    return cleanPhone.length >= 7 && cleanPhone.length <= 15;
   };
 
   const formatPhoneNumber = (phone: string, code: string): string => {
-    if (code === '+254' && phone.length >= 9) {
-      const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+    // Remove any spaces, dashes, or special characters for processing
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+    
+    // Format based on country code
+    if (code === '+254' && cleanPhone.length >= 9) {
+      // Kenya: XXX XXX XXX
       if (cleanPhone.length === 9) {
         return cleanPhone.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
       }
     }
-    return phone;
+    
+    if (code === '+1' && cleanPhone.length === 10) {
+      // US/Canada: (XXX) XXX-XXXX
+      return cleanPhone.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+    }
+    
+    if (code === '+44' && cleanPhone.length >= 10) {
+      // UK: XXXX XXX XXX or similar
+      if (cleanPhone.length === 10) {
+        return cleanPhone.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3');
+      }
+      if (cleanPhone.length === 11) {
+        return cleanPhone.replace(/(\d{5})(\d{3})(\d{3})/, '$1 $2 $3');
+      }
+    }
+    
+    // For other countries or if length doesn't match, apply basic formatting
+    if (cleanPhone.length >= 7) {
+      // Basic formatting: groups of 3-4 digits
+      if (cleanPhone.length <= 10) {
+        return cleanPhone.replace(/(\d{3})(\d{3})(\d+)/, '$1 $2 $3');
+      } else {
+        return cleanPhone.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1 $2 $3 $4');
+      }
+    }
+    
+    return phone; // Return original if too short to format
   };
 
   const handlePhoneChange = (phoneNumber: string) => {
@@ -85,9 +138,9 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     const cleanNumber = phoneNumber.replace(/[^\d\s\-]/g, '');
     const formattedNumber = formatPhoneNumber(cleanNumber, selectedCountryCode);
     
-    if (validatePhoneNumber) {
-      const isValid = validateKenyanPhone(cleanNumber, selectedCountryCode);
-      if (!isValid && cleanNumber.length >= 9) {
+    if (enableValidation) {
+      const isValid = validatePhoneNumber(cleanNumber, selectedCountryCode);
+      if (!isValid && cleanNumber.length >= 7) {
         setPhoneError('Please enter a valid phone number');
       } else {
         setPhoneError(undefined);
@@ -105,10 +158,10 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     setShowPicker(false);
     
     // Re-validate phone number with new country code
-    if (value && validatePhoneNumber) {
+    if (value && enableValidation) {
       const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
-      const isValid = validateKenyanPhone(cleanPhone, newCode);
-      if (!isValid && cleanPhone.length >= 9) {
+      const isValid = validatePhoneNumber(cleanPhone, newCode);
+      if (!isValid && cleanPhone.length >= 7) {
         setPhoneError('Please enter a valid phone number for the selected country');
       } else {
         setPhoneError(undefined);

@@ -199,16 +199,15 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     const newErrors: {[key: string]: string} = {};
     const previousErrors = { ...errors };
 
-    // Phone number validation with smart country detection
+    // Phone number validation - accept all international formats
     const cleanedPhone = phoneNumber.replace(/\D/g, '');
-    const usPhone = cleanedPhone.startsWith('1') ? cleanedPhone.slice(1) : cleanedPhone;
     
     if (!phoneNumber) {
       newErrors.phoneNumber = 'Phone number is required to access your account';
-    } else if (usPhone.length !== 10) {
-      newErrors.phoneNumber = `Please enter a complete 10-digit US phone number (${usPhone.length}/10 digits)`;
-    } else if (!usPhone.match(/^[2-9]\d{2}[2-9]\d{2}\d{4}$/)) {
-      newErrors.phoneNumber = 'Please enter a valid US phone number (area code cannot start with 0 or 1)';
+    } else if (cleanedPhone.length < 7) {
+      newErrors.phoneNumber = 'Please enter a valid phone number';
+    } else if (cleanedPhone.length > 15) {
+      newErrors.phoneNumber = 'Phone number too long (max 15 digits)';
     }
 
     // PIN validation with helpful guidance
@@ -250,45 +249,71 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const formatPhoneNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
     
-    // Detect country based on input
-    if (cleaned.startsWith('1') && cleaned.length > 10) {
-      setDetectedCountry('US');
-    } else if (cleaned.length === 10) {
-      setDetectedCountry('US');
-    } else if (cleaned.length > 10 && !cleaned.startsWith('1')) {
-      setDetectedCountry('Other');
-    }
-    
-    // Smart formatting with country detection
+    // Default to Kenya format but support all international formats
     let formatted = '';
     
     if (cleaned.length === 0) {
       formatted = '';
+      setDetectedCountry('US'); // Reset to default
+    } else if (cleaned.startsWith('254')) {
+      // Kenya format: +254 XXX XXX XXX
+      setDetectedCountry('Other');
+      if (cleaned.length <= 3) {
+        formatted = `+254`;
+      } else if (cleaned.length <= 6) {
+        formatted = `+254 ${cleaned.slice(3)}`;
+      } else if (cleaned.length <= 9) {
+        formatted = `+254 ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
+      } else {
+        formatted = `+254 ${cleaned.slice(3, 6)} ${cleaned.slice(6, 9)} ${cleaned.slice(9, 12)}`;
+      }
+    } else if (cleaned.startsWith('1') && cleaned.length > 10) {
+      // US format with country code: +1 (XXX) XXX-XXXX
+      setDetectedCountry('US');
+      const usNumber = cleaned.slice(1);
+      if (usNumber.length <= 3) {
+        formatted = `+1 (${usNumber}`;
+      } else if (usNumber.length <= 6) {
+        formatted = `+1 (${usNumber.slice(0, 3)}) ${usNumber.slice(3)}`;
+      } else {
+        formatted = `+1 (${usNumber.slice(0, 3)}) ${usNumber.slice(3, 6)}-${usNumber.slice(6, 10)}`;
+      }
+    } else if (cleaned.length === 10 && !cleaned.startsWith('254') && !cleaned.startsWith('1')) {
+      // Assume US format without country code: (XXX) XXX-XXXX
+      setDetectedCountry('US');
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     } else if (cleaned.length <= 3) {
       // First 3 digits
       formatted = cleaned;
+      setDetectedCountry('US');
     } else if (cleaned.length <= 6) {
-      // Area code + first 3 digits: (XXX) XXX
+      // Partial number
+      setDetectedCountry('US');
       formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
     } else if (cleaned.length <= 10) {
-      // Full US format: (XXX) XXX-XXXX
+      // Assume US format: (XXX) XXX-XXXX
+      setDetectedCountry('US');
       formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      // US with country code: +1 (XXX) XXX-XXXX
-      formatted = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7, 11)}`;
     } else {
-      // International format or overflow - limit to 10 digits for US
-      const usNumber = cleaned.startsWith('1') ? cleaned.slice(1, 11) : cleaned.slice(0, 10);
-      if (usNumber.length === 10) {
-        formatted = `(${usNumber.slice(0, 3)}) ${usNumber.slice(3, 6)}-${usNumber.slice(6)}`;
+      // International format - keep as is with basic formatting
+      setDetectedCountry('Other');
+      if (cleaned.length > 15) {
+        // Limit to 15 digits per ITU-T E.164
+        formatted = cleaned.slice(0, 15);
       } else {
-        formatted = usNumber;
+        formatted = cleaned;
       }
     }
     
-    // Auto-focus to PIN field when phone number is complete (10 digits)
-    const digitCount = cleaned.replace(/^1/, '').length; // Remove country code if present
-    if (digitCount === 10 && authMethod === 'pin' && pinInputRef.current) {
+    // Auto-focus to PIN field when phone number seems complete
+    const isComplete = (
+      (cleaned.length === 10 && !cleaned.startsWith('254') && !cleaned.startsWith('1')) || // US without country code
+      (cleaned.length === 11 && cleaned.startsWith('1')) || // US with country code
+      (cleaned.length === 12 && cleaned.startsWith('254')) || // Kenya
+      (cleaned.length >= 7 && cleaned.length <= 15) // Other international
+    );
+    
+    if (isComplete && authMethod === 'pin' && pinInputRef.current) {
       setTimeout(() => {
         pinInputRef.current?.focus();
         triggerHapticFeedback.light();
@@ -326,6 +351,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       triggerHapticFeedback.success();
       voiceAnnouncements.loginSuccess();
       Alert.alert('Welcome Back!', 'Login successful');
+      
+      // Navigate to Home after successful login
+      navigation.navigate('Home');
     } catch (error) {
       // Increment failed attempts
       setFailedAttempts(prev => prev + 1);
@@ -824,7 +852,20 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           {/* Login Button */}
           <Button
             title={authMethod === 'biometric' ? `Sign In with ${biometricDescription}` : 'Sign In Securely'}
-            onPress={authMethod === 'biometric' ? handleBiometricAuth : handleLogin}
+            onPress={() => {
+              console.log('🔍 Login button pressed!');
+              console.log('🔍 Auth method:', authMethod);
+              console.log('🔍 Phone number:', phoneNumber);
+              console.log('🔍 PIN length:', pin.length);
+              console.log('🔍 Is blocked:', isBlocked);
+              console.log('🔍 Button disabled:', isBlocked || !phoneNumber || (authMethod === 'pin' && pin.length < 4));
+              
+              if (authMethod === 'biometric') {
+                handleBiometricAuth();
+              } else {
+                handleLogin();
+              }
+            }}
             loading={isLoading || (authMethod === 'biometric' && isBiometricLoading)}
             disabled={isBlocked || !phoneNumber || (authMethod === 'pin' && pin.length < 4)}
             style={styles.loginButton}

@@ -12,8 +12,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 // import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
 
 // Import components
 import { Afya360Logo } from '../../components/common/Afya360Logo';
@@ -25,22 +23,19 @@ import { TEXT_STYLES } from '../../styles/globalStyles';
 // Import hooks
 import { useAuth } from '../../hooks/useAuth';
 
-// Types
-import { TabParamList } from '../../types';
+// Types - simplified to match working screens
+type NavigationProp = {
+  navigate: (screen: string, params?: any) => void;
+  goBack: () => void;
+};
 
-type HomeScreenNavigationProp = StackNavigationProp<
-  TabParamList,
-  'Home'
->;
-
-type HomeScreenRouteProp = RouteProp<
-  TabParamList,
-  'Home'
->;
+type RouteProp = {
+  params?: any;
+};
 
 interface Props {
-  navigation: HomeScreenNavigationProp;
-  route: HomeScreenRouteProp;
+  navigation: NavigationProp;
+  route?: RouteProp;
 }
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {

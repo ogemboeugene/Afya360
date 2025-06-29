@@ -16,7 +16,6 @@ import {
   SafeAreaView,
 } from 'react-native';
 // import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
 import LinearGradient from 'react-native-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -34,16 +33,14 @@ import { TEXT_STYLES } from '../../styles/globalStyles';
 // Import hooks
 import { useAuth } from '../../hooks/useAuth';
 
-// Types
-import { RootStackParamList } from '../../types';
-
-type ProfileSetupNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  'ProfileSetup'
->;
+// Types - simplified to match working screens
+type NavigationProp = {
+  navigate: (screen: string, params?: any) => void;
+  goBack: () => void;
+};
 
 interface Props {
-  navigation: ProfileSetupNavigationProp;
+  navigation: NavigationProp;
 }
 
 interface ProfileData {
@@ -153,7 +150,7 @@ export const ProfileSetupScreen: React.FC<Props> = ({ navigation }) => {
         nationalId: profileData.nationalId || undefined,
       });
       
-      navigation.navigate('SecuritySetup');
+      navigation.navigate('Permissions');
     } catch (error) {
       Alert.alert('Error', 'Failed to save profile. Please try again.');
     }

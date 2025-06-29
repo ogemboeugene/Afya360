@@ -222,28 +222,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials);
+      // Mock successful login for development (no backend)
+      console.log('🔍 AuthContext: Mock login for credentials:', credentials);
       
-      if (response.success && response.data) {
-        const { user, authToken, refreshToken, expiresIn } = response.data;
-        
-        // Calculate session expiry
-        const sessionExpiry = new Date(Date.now() + (expiresIn * 1000));
-        
-        // Store authentication data
-        await Promise.all([
-          storageService.setItem(STORAGE_KEYS.USER_DATA, user),
-          storageService.setItem(STORAGE_KEYS.SESSION_EXPIRY, sessionExpiry.toISOString()),
-          apiClient.setAuthToken(authToken, refreshToken)
-        ]);
+      // Create mock user data matching the correct User interface
+      const mockUser: User = {
+        id: '1',
+        email: 'john.doe@example.com',
+        phone: credentials.phoneNumber,
+        firstName: 'John',
+        lastName: 'Doe',
+        dateOfBirth: new Date('1990-01-01'),
+        gender: 'male',
+        nationalId: '12345678',
+        isVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emergencyContact: {
+          id: '1',
+          name: 'Jane Doe',
+          phone: '+254712345678',
+          relationship: 'spouse',
+          isPrimary: true,
+          canAccessRecords: true
+        },
+        preferences: {
+          language: 'en',
+          notifications: {
+            pushNotifications: true,
+            emailNotifications: true,
+            smsNotifications: true,
+            medicationReminders: true,
+            appointmentReminders: true,
+            healthTips: true,
+            emergencyAlerts: true
+          },
+          biometricEnabled: false,
+          theme: 'system'
+        }
+      };
 
-        // Update state
-        dispatch({ type: 'SET_USER', payload: user });
-        dispatch({ type: 'SET_TOKENS', payload: { authToken, refreshToken } });
-        dispatch({ type: 'SET_SESSION_EXPIRY', payload: sessionExpiry });
-      }
+      const mockAuthToken = 'mock_auth_token_' + Date.now();
+      const mockRefreshToken = 'mock_refresh_token_' + Date.now();
+      const expiresIn = 24 * 60 * 60; // 24 hours in seconds
+      
+      // Calculate session expiry
+      const sessionExpiry = new Date(Date.now() + (expiresIn * 1000));
+      
+      // Store authentication data (simplified for mock)
+      await Promise.all([
+        storageService.setItem(STORAGE_KEYS.USER_DATA, mockUser),
+        storageService.setItem(STORAGE_KEYS.AUTH_TOKEN, mockAuthToken),
+        // Skip API client auth token setting for mock
+      ]);
+
+      // Update state
+      dispatch({ type: 'SET_USER', payload: mockUser });
+      dispatch({ type: 'SET_TOKENS', payload: { authToken: mockAuthToken, refreshToken: mockRefreshToken } });
+      dispatch({ type: 'SET_SESSION_EXPIRY', payload: sessionExpiry });
+      
+      console.log('🔍 AuthContext: Mock login successful, user set:', mockUser);
     } catch (error: any) {
-      const message = error.message || ERROR_MESSAGES.LOGIN_FAILED;
+      const message = error.message || ERROR_MESSAGES.INVALID_CREDENTIALS;
       dispatch({ type: 'SET_ERROR', payload: message });
       throw error;
     } finally {

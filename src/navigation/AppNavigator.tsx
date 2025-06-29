@@ -16,6 +16,11 @@ import { COLORS } from '../styles/colors';
 // Import actual screen components
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
+import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
+import { PhoneVerificationScreen } from '../screens/auth/PhoneVerificationScreen';
+import { ProfileSetupScreen } from '../screens/auth/ProfileSetupScreen';
+import { PermissionsScreen } from '../screens/onboarding/PermissionsScreen';
+import { HomeScreen } from '../screens/dashboard/HomeScreen';
 
 // Navigation state management
 type NavigationState = {
@@ -111,10 +116,22 @@ const AppNavigator: React.FC = () => {
   
   const { user, isLoading } = useAuth();
   const [navigationState, setNavigationState] = useState<NavigationState>({
-    currentScreen: user ? 'Home' : 'Login'
+    currentScreen: user ? 'Home' : 'Welcome' // Start with Welcome for new users
   });
   
   console.log('🔍 AppNavigator rendering - user:', user ? 'authenticated' : 'not authenticated', 'isLoading:', isLoading, 'currentScreen:', navigationState.currentScreen);
+
+  // Listen for authentication state changes and navigate accordingly
+  React.useEffect(() => {
+    console.log('🔍 AppNavigator: Auth state changed - user:', user ? 'authenticated' : 'not authenticated');
+    if (user && navigationState.currentScreen !== 'Home') {
+      console.log('🔍 AppNavigator: User authenticated, navigating to Home');
+      setNavigationState({ currentScreen: 'Home' });
+    } else if (!user && navigationState.currentScreen === 'Home') {
+      console.log('🔍 AppNavigator: User logged out, navigating to Welcome');
+      setNavigationState({ currentScreen: 'Welcome' });
+    }
+  }, [user, navigationState.currentScreen]);
 
   // Navigation function
   const navigate = (screen: string, params?: any) => {
@@ -125,10 +142,30 @@ const AppNavigator: React.FC = () => {
   // Back navigation function
   const goBack = () => {
     console.log('🔍 Going back from:', navigationState.currentScreen);
-    if (user) {
-      navigate('Home');
-    } else {
-      navigate('Login');
+    
+    // Define proper back navigation flow
+    switch (navigationState.currentScreen) {
+      case 'SignUp':
+        navigate('Welcome');
+        break;
+      case 'PhoneVerification':
+        navigate('SignUp');
+        break;
+      case 'ProfileSetup':
+        navigate('PhoneVerification');
+        break;
+      case 'Permissions':
+        navigate('ProfileSetup');
+        break;
+      case 'Login':
+        navigate('Welcome');
+        break;
+      default:
+        if (user) {
+          navigate('Home');
+        } else {
+          navigate('Welcome');
+        }
     }
   };
 
@@ -150,6 +187,38 @@ const AppNavigator: React.FC = () => {
     console.log('🔍 AppNavigator: Rendering screen:', currentScreen);
 
     switch (currentScreen) {
+      case 'Welcome':
+        return (
+          <SimpleNavigator>
+            <WelcomeScreen 
+              navigation={{ 
+                navigate,
+                goBack,
+                // Mock navigation object for compatibility
+                setOptions: () => {},
+                addListener: () => () => {},
+                isFocused: () => true,
+                canGoBack: () => false,
+                getId: () => 'Welcome',
+                getParent: () => undefined,
+                getState: () => ({ key: 'Welcome', index: 0, routeNames: ['Welcome'], routes: [{ key: 'Welcome', name: 'Welcome' }] }),
+                dispatch: () => {},
+                reset: () => {},
+                setParams: () => {},
+                push: navigate,
+                pop: goBack,
+                popToTop: () => navigate('Welcome'),
+                replace: navigate,
+              } as any} 
+              route={{
+                key: 'Welcome',
+                name: 'Welcome',
+                params: navigationState.params || {}
+              } as any}
+            />
+          </SimpleNavigator>
+        );
+
       case 'Login':
         return (
           <SimpleNavigator>
@@ -161,7 +230,7 @@ const AppNavigator: React.FC = () => {
                 setOptions: () => {},
                 addListener: () => () => {},
                 isFocused: () => true,
-                canGoBack: () => false,
+                canGoBack: () => true,
                 getId: () => 'Login',
                 getParent: () => undefined,
                 getState: () => ({ key: 'Login', index: 0, routeNames: ['Login'], routes: [{ key: 'Login', name: 'Login' }] }),
@@ -170,7 +239,7 @@ const AppNavigator: React.FC = () => {
                 setParams: () => {},
                 push: navigate,
                 pop: goBack,
-                popToTop: () => navigate('Login'),
+                popToTop: () => navigate('Welcome'),
                 replace: navigate,
               } as any} 
               route={{
@@ -182,12 +251,149 @@ const AppNavigator: React.FC = () => {
           </SimpleNavigator>
         );
 
+      case 'SignUp':
+        return (
+          <SimpleNavigator>
+            <SignUpScreen 
+              navigation={{ 
+                navigate,
+                goBack,
+                // Mock navigation object for compatibility
+                setOptions: () => {},
+                addListener: () => () => {},
+                isFocused: () => true,
+                canGoBack: () => true,
+                getId: () => 'SignUp',
+                getParent: () => undefined,
+                getState: () => ({ key: 'SignUp', index: 0, routeNames: ['SignUp'], routes: [{ key: 'SignUp', name: 'SignUp' }] }),
+                dispatch: () => {},
+                reset: () => {},
+                setParams: () => {},
+                push: navigate,
+                pop: goBack,
+                popToTop: () => navigate('Welcome'),
+                replace: navigate,
+              } as any} 
+              route={{
+                key: 'SignUp',
+                name: 'SignUp',
+                params: navigationState.params || {}
+              } as any}
+            />
+          </SimpleNavigator>
+        );
+
+      case 'PhoneVerification':
+        return (
+          <SimpleNavigator>
+            <PhoneVerificationScreen 
+              navigation={{ 
+                navigate,
+                goBack,
+                // Mock navigation object for compatibility
+                setOptions: () => {},
+                addListener: () => () => {},
+                isFocused: () => true,
+                canGoBack: () => true,
+                getId: () => 'PhoneVerification',
+                getParent: () => undefined,
+                getState: () => ({ key: 'PhoneVerification', index: 0, routeNames: ['PhoneVerification'], routes: [{ key: 'PhoneVerification', name: 'PhoneVerification' }] }),
+                dispatch: () => {},
+                reset: () => {},
+                setParams: () => {},
+                push: navigate,
+                pop: goBack,
+                popToTop: () => navigate('Welcome'),
+                replace: navigate,
+              } as any} 
+              route={{
+                key: 'PhoneVerification',
+                name: 'PhoneVerification',
+                params: navigationState.params || {}
+              } as any}
+            />
+          </SimpleNavigator>
+        );
+
+      case 'ProfileSetup':
+        return (
+          <SimpleNavigator>
+            <ProfileSetupScreen 
+              navigation={{ 
+                navigate,
+                goBack,
+                // Mock navigation object for compatibility
+                setOptions: () => {},
+                addListener: () => () => {},
+                isFocused: () => true,
+                canGoBack: () => true,
+                getId: () => 'ProfileSetup',
+                getParent: () => undefined,
+                getState: () => ({ key: 'ProfileSetup', index: 0, routeNames: ['ProfileSetup'], routes: [{ key: 'ProfileSetup', name: 'ProfileSetup' }] }),
+                dispatch: () => {},
+                reset: () => {},
+                setParams: () => {},
+                push: navigate,
+                pop: goBack,
+                popToTop: () => navigate('Welcome'),
+                replace: navigate,
+              } as any}
+            />
+          </SimpleNavigator>
+        );
+
+      case 'Permissions':
+        return (
+          <SimpleNavigator>
+            <PermissionsScreen 
+              navigation={{ 
+                navigate,
+                goBack,
+                // Mock navigation object for compatibility
+                setOptions: () => {},
+                addListener: () => () => {},
+                isFocused: () => true,
+                canGoBack: () => true,
+                getId: () => 'Permissions',
+                getParent: () => undefined,
+                getState: () => ({ key: 'Permissions', index: 0, routeNames: ['Permissions'], routes: [{ key: 'Permissions', name: 'Permissions' }] }),
+                dispatch: () => {},
+                reset: () => {},
+                setParams: () => {},
+                push: navigate,
+                pop: goBack,
+                popToTop: () => navigate('Welcome'),
+                replace: navigate,
+              } as any}
+            />
+          </SimpleNavigator>
+        );
+
       case 'Home':
         return (
-          <PlaceholderScreen 
-            screenName="Home" 
-            onNavigate={navigate}
-          />
+          <SimpleNavigator>
+            <HomeScreen 
+              navigation={{ 
+                navigate,
+                goBack,
+                // Mock navigation object for compatibility
+                setOptions: () => {},
+                addListener: () => () => {},
+                isFocused: () => true,
+                canGoBack: () => false,
+                getId: () => 'Home',
+                getParent: () => undefined,
+                getState: () => ({ key: 'Home', index: 0, routeNames: ['Home'], routes: [{ key: 'Home', name: 'Home' }] }),
+                dispatch: () => {},
+                reset: () => {},
+                setParams: () => {},
+                push: navigate,
+                pop: goBack,
+                popToTop: () => navigate('Home'),
+                replace: navigate,
+              } as any}
+            />
+          </SimpleNavigator>
         );
 
       case 'Health':
@@ -217,54 +423,13 @@ const AppNavigator: React.FC = () => {
           />
         );
 
-      case 'SignUp':
-        return (
-          <SimpleNavigator>
-            <SignUpScreen 
-              navigation={{ 
-                navigate,
-                goBack,
-                // Mock navigation object for compatibility
-                setOptions: () => {},
-                addListener: () => () => {},
-                isFocused: () => true,
-                canGoBack: () => true,
-                getId: () => 'SignUp',
-                getParent: () => undefined,
-                getState: () => ({ key: 'SignUp', index: 0, routeNames: ['SignUp'], routes: [{ key: 'SignUp', name: 'SignUp' }] }),
-                dispatch: () => {},
-                reset: () => {},
-                setParams: () => {},
-                push: navigate,
-                pop: goBack,
-                popToTop: () => navigate('Login'),
-                replace: navigate,
-              } as any} 
-              route={{
-                key: 'SignUp',
-                name: 'SignUp',
-                params: navigationState.params || {}
-              } as any}
-            />
-          </SimpleNavigator>
-        );
-
-      case 'PhoneVerification':
-        return (
-          <PlaceholderScreen 
-            screenName="Phone Verification" 
-            onNavigate={navigate}
-            onBack={goBack}
-          />
-        );
-
       default:
-        console.log('🔍 Unknown screen:', currentScreen, 'redirecting to Login');
+        console.log('🔍 Unknown screen:', currentScreen, 'redirecting to Welcome');
         return (
           <PlaceholderScreen 
             screenName="Unknown Screen" 
             onNavigate={navigate}
-            onBack={goBack}
+            onBack={() => navigate('Welcome')}
           />
         );
     }

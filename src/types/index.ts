@@ -32,6 +32,34 @@ export interface AuthCredentials {
   password: string;
 }
 
+export interface LoginCredentials {
+  phoneNumber: string;
+  pin?: string;
+  authMethod: 'pin' | 'biometric';
+}
+
+export interface RegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+  dateOfBirth: Date;
+  gender: 'male' | 'female' | 'other';
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  authToken: string | null;
+  refreshToken: string | null;
+  sessionExpiry: Date | null;
+  biometricEnabled: boolean;
+  pinEnabled: boolean;
+  error: string | null;
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
