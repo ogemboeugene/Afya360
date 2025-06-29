@@ -4,7 +4,7 @@
  * Features: Context-aware messaging, biometric auth, PIN/Password, rate limiting, accessibility, support
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Linking,
+  Animated,
+  Vibration,
+  AccessibilityInfo,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconMCI from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -68,6 +71,77 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockTimeRemaining, setBlockTimeRemaining] = useState(0);
+  const [rememberDevice, setRememberDevice] = useState(false);
+  const [lastLoginTime, setLastLoginTime] = useState<string | null>(null);
+  const [detectedCountry, setDetectedCountry] = useState<'US' | 'Other'>('US');
+  const [liveRegionMessage, setLiveRegionMessage] = useState<string>('');
+  const [highContrastMode, setHighContrastMode] = useState<boolean>(false);
+
+  // Animation for biometric button
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Refs for auto-focus progression
+  const pinInputRef = useRef<any>(null);
+
+  // Keyboard navigation support
+  const phoneInputRef = useRef<any>(null);
+  const loginButtonRef = useRef<any>(null);
+
+  // Focus management for better UX (simplified for React Native compatibility)
+  const focusNextField = (currentField: string) => {
+    switch (currentField) {
+      case 'phone':
+        if (authMethod === 'pin' && pinInputRef.current) {
+          setTimeout(() => pinInputRef.current?.focus(), 100);
+        }
+        break;
+      case 'pin':
+        // PIN is complete, could focus login button or trigger login
+        break;
+    }
+  };
+
+  // Rate limiting - blocks after 3 failed attempts for 30 seconds
+
+  // Haptic Feedback Functions
+  const triggerHapticFeedback = {
+    light: () => {
+      if (Platform.OS === 'ios') {
+        // iOS light impact
+        Vibration.vibrate(10);
+      } else {
+        // Android light vibration
+        Vibration.vibrate(50);
+      }
+    },
+    medium: () => {
+      if (Platform.OS === 'ios') {
+        // iOS medium impact
+        Vibration.vibrate([0, 100]);
+      } else {
+        // Android medium vibration
+        Vibration.vibrate(100);
+      }
+    },
+    error: () => {
+      if (Platform.OS === 'ios') {
+        // iOS error pattern
+        Vibration.vibrate([0, 100, 50, 100]);
+      } else {
+        // Android error pattern
+        Vibration.vibrate([0, 150, 100, 150]);
+      }
+    },
+    success: () => {
+      if (Platform.OS === 'ios') {
+        // iOS success pattern
+        Vibration.vibrate([0, 50, 25, 25]);
+      } else {
+        // Android success pattern
+        Vibration.vibrate([0, 80, 40, 40]);
+      }
+    }
+  };
 
   // Rate limiting - blocks after 3 failed attempts for 30 seconds
   useEffect(() => {
@@ -98,40 +172,136 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [biometricError]);
 
+  // Pulse animation for biometric button
+  useEffect(() => {
+    if (authMethod === 'biometric') {
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulseAnimation.start();
+      
+      return () => pulseAnimation.stop();
+    }
+  }, [authMethod, pulseAnim]);
+
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
+    const previousErrors = { ...errors };
 
-    // Phone number validation
+    // Phone number validation with smart country detection
     const cleanedPhone = phoneNumber.replace(/\D/g, '');
+    const usPhone = cleanedPhone.startsWith('1') ? cleanedPhone.slice(1) : cleanedPhone;
+    
     if (!phoneNumber) {
-      newErrors.phoneNumber = 'Phone number is required';
-    } else if (cleanedPhone.length !== 10) {
-      newErrors.phoneNumber = 'Please enter a valid 10-digit phone number';
+      newErrors.phoneNumber = 'Phone number is required to access your account';
+    } else if (usPhone.length !== 10) {
+      newErrors.phoneNumber = `Please enter a complete 10-digit US phone number (${usPhone.length}/10 digits)`;
+    } else if (!usPhone.match(/^[2-9]\d{2}[2-9]\d{2}\d{4}$/)) {
+      newErrors.phoneNumber = 'Please enter a valid US phone number (area code cannot start with 0 or 1)';
     }
 
-    // PIN validation
+    // PIN validation with helpful guidance
     if (authMethod === 'pin') {
       if (!pin) {
-        newErrors.pin = 'PIN is required';
+        newErrors.pin = 'Your 4-digit PIN is required for secure access';
       } else if (pin.length < 4) {
-        newErrors.pin = 'PIN must be at least 4 digits';
+        newErrors.pin = `PIN must be 4 digits (entered: ${pin.length}/4)`;
+      } else if (!pin.match(/^\d{4}$/)) {
+        newErrors.pin = 'PIN must contain only numbers';
       }
     }
 
     setErrors(newErrors);
+    
+    // Voice announcements for validation changes
+    Object.keys(newErrors).forEach(field => {
+      if (!previousErrors[field] || previousErrors[field] !== newErrors[field]) {
+        // New error or changed error
+        voiceAnnouncements.validationError(field === 'phoneNumber' ? 'Phone number' : 'PIN', newErrors[field]);
+      }
+    });
+
+    // Announce validation success for fields that were previously invalid but are now valid
+    Object.keys(previousErrors).forEach(field => {
+      if (previousErrors[field] && !newErrors[field]) {
+        voiceAnnouncements.validationSuccess(field === 'phoneNumber' ? 'Phone number' : 'PIN');
+      }
+    });
+    
+    // Trigger haptic feedback for validation errors
+    if (Object.keys(newErrors).length > 0) {
+      triggerHapticFeedback.error();
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
   const formatPhoneNumber = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length <= 10) {
-      return cleaned.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3').trim();
+    
+    // Detect country based on input
+    if (cleaned.startsWith('1') && cleaned.length > 10) {
+      setDetectedCountry('US');
+    } else if (cleaned.length === 10) {
+      setDetectedCountry('US');
+    } else if (cleaned.length > 10 && !cleaned.startsWith('1')) {
+      setDetectedCountry('Other');
     }
-    return cleaned.substring(0, 10).replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
+    
+    // Smart formatting with country detection
+    let formatted = '';
+    
+    if (cleaned.length === 0) {
+      formatted = '';
+    } else if (cleaned.length <= 3) {
+      // First 3 digits
+      formatted = cleaned;
+    } else if (cleaned.length <= 6) {
+      // Area code + first 3 digits: (XXX) XXX
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    } else if (cleaned.length <= 10) {
+      // Full US format: (XXX) XXX-XXXX
+      formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      // US with country code: +1 (XXX) XXX-XXXX
+      formatted = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7, 11)}`;
+    } else {
+      // International format or overflow - limit to 10 digits for US
+      const usNumber = cleaned.startsWith('1') ? cleaned.slice(1, 11) : cleaned.slice(0, 10);
+      if (usNumber.length === 10) {
+        formatted = `(${usNumber.slice(0, 3)}) ${usNumber.slice(3, 6)}-${usNumber.slice(6)}`;
+      } else {
+        formatted = usNumber;
+      }
+    }
+    
+    // Auto-focus to PIN field when phone number is complete (10 digits)
+    const digitCount = cleaned.replace(/^1/, '').length; // Remove country code if present
+    if (digitCount === 10 && authMethod === 'pin' && pinInputRef.current) {
+      setTimeout(() => {
+        pinInputRef.current?.focus();
+        triggerHapticFeedback.light();
+      }, 100);
+    }
+    
+    return formatted;
   };
 
   const handleLogin = async () => {
     if (isBlocked) {
+      triggerHapticFeedback.error();
+      voiceAnnouncements.accountLocked(blockTimeRemaining);
       Alert.alert(
         'Account Temporarily Locked',
         `Please wait ${blockTimeRemaining} seconds before trying again.`
@@ -140,6 +310,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     if (!validateForm()) return;
+
+    // Light haptic feedback for button press
+    triggerHapticFeedback.light();
 
     try {
       await login({ 
@@ -150,10 +323,18 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       
       // Reset failed attempts on successful login
       setFailedAttempts(0);
+      triggerHapticFeedback.success();
+      voiceAnnouncements.loginSuccess();
       Alert.alert('Welcome Back!', 'Login successful');
     } catch (error) {
       // Increment failed attempts
       setFailedAttempts(prev => prev + 1);
+      
+      // Error haptic feedback
+      triggerHapticFeedback.error();
+      
+      const errorMessage = 'Please check your credentials and try again.';
+      voiceAnnouncements.loginError(errorMessage);
       
       if (failedAttempts >= 2) {
         Alert.alert(
@@ -161,7 +342,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           'Your account will be temporarily locked after one more failed attempt for security reasons.'
         );
       } else {
-        Alert.alert('Login Failed', 'Please check your credentials and try again.');
+        Alert.alert('Login Failed', errorMessage);
       }
       console.error('Login failed:', error);
     }
@@ -169,6 +350,8 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleBiometricAuth = async () => {
     if (isBlocked) {
+      triggerHapticFeedback.error();
+      voiceAnnouncements.accountLocked(blockTimeRemaining);
       Alert.alert(
         'Account Temporarily Locked',
         `Please wait ${blockTimeRemaining} seconds before trying again.`
@@ -176,14 +359,21 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    // Light haptic feedback for button press
+    triggerHapticFeedback.light();
+
     try {
       setErrors({});
       
       if (!phoneNumber) {
-        setErrors({ phoneNumber: 'Please enter your phone number first' });
+        triggerHapticFeedback.error();
+        const errorMsg = 'Please enter your phone number first';
+        voiceAnnouncements.validationError('Phone number', errorMsg);
+        setErrors({ phoneNumber: errorMsg });
         return;
       }
 
+      voiceAnnouncements.biometricPrompt();
       const result = await authenticateBiometric();
       
       if (result.success) {
@@ -193,10 +383,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         });
         
         setFailedAttempts(0);
+        triggerHapticFeedback.success();
+        voiceAnnouncements.loginSuccess();
         Alert.alert('Welcome Back!', 'Biometric authentication successful');
       } else {
         if (result.error && !result.error.includes('cancelled')) {
           setFailedAttempts(prev => prev + 1);
+          triggerHapticFeedback.error();
+          voiceAnnouncements.loginError('Biometric authentication was unsuccessful');
           Alert.alert(
             'Authentication Failed', 
             'Biometric authentication was unsuccessful. Please try using your PIN instead.',
@@ -209,6 +403,8 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         }
       }
     } catch (error) {
+      triggerHapticFeedback.error();
+      voiceAnnouncements.loginError('Something went wrong with biometric authentication');
       console.error('Biometric authentication error:', error);
       Alert.alert(
         'Authentication Error', 
@@ -249,6 +445,142 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
+  // Voice Announcements for Accessibility
+  const announceToScreen = (message: string, priority: 'assertive' | 'polite' = 'polite') => {
+    if (Platform.OS === 'ios') {
+      // iOS announcement
+      AccessibilityInfo.announceForAccessibility(message);
+    } else {
+      // Android announcement - use live region
+      setLiveRegionMessage(message);
+      // Clear after a short delay to allow for re-announcements
+      setTimeout(() => setLiveRegionMessage(''), 100);
+    }
+  };
+
+  const voiceAnnouncements = {
+    validationError: (field: string, error: string) => {
+      announceToScreen(`${field} error: ${error}`, 'assertive');
+    },
+    validationSuccess: (field: string) => {
+      announceToScreen(`${field} is now valid`, 'polite');
+    },
+    loginError: (message: string) => {
+      announceToScreen(`Login failed: ${message}`, 'assertive');
+    },
+    loginSuccess: () => {
+      announceToScreen('Login successful. Welcome back!', 'polite');
+    },
+    accountLocked: (timeRemaining: number) => {
+      announceToScreen(`Account temporarily locked. Please wait ${timeRemaining} seconds before trying again.`, 'assertive');
+    },
+    biometricPrompt: () => {
+      announceToScreen('Biometric authentication prompted. Please use your fingerprint or face ID.', 'polite');
+    }
+  };
+
+  // Keyboard navigation handlers
+  const handleKeyPress = (event: any, elementId: string) => {
+    if (Platform.OS === 'web') {
+      const { key } = event.nativeEvent;
+      
+      switch (key) {
+        case 'Tab':
+          event.preventDefault();
+          handleTabNavigation(elementId, !event.shiftKey);
+          break;
+        case 'Enter':
+        case ' ':
+          event.preventDefault();
+          handleElementActivation(elementId);
+          break;
+        case 'Escape':
+          event.preventDefault();
+          handleEscape();
+          break;
+      }
+    }
+  };
+
+  const handleTabNavigation = (currentElement: string, forward: boolean) => {
+    const navigationOrder = [
+      'phoneNumber',
+      ...(authMethod === 'pin' ? ['pin'] : []),
+      'authMethodPin',
+      ...(isBiometricAvailable ? ['authMethodBiometric'] : []),
+      'rememberDevice',
+      ...(authMethod === 'biometric' ? ['biometricAuth'] : ['login']),
+      'forgotCredentials',
+      'support',
+      'emergency',
+      'signUp'
+    ];
+
+    const currentIndex = navigationOrder.indexOf(currentElement);
+    let nextIndex;
+
+    if (forward) {
+      nextIndex = (currentIndex + 1) % navigationOrder.length;
+    } else {
+      nextIndex = currentIndex - 1 < 0 ? navigationOrder.length - 1 : currentIndex - 1;
+    }
+
+    const nextElement = navigationOrder[nextIndex];
+    setFocusedElement(nextElement);
+    focusElement(nextElement);
+  };
+
+  const focusElement = (elementId: string) => {
+    switch (elementId) {
+      case 'phoneNumber':
+        phoneInputRef.current?.focus();
+        break;
+      case 'pin':
+        pinInputRef.current?.focus();
+        break;
+      case 'login':
+        loginButtonRef.current?.focus();
+        break;
+      case 'biometricAuth':
+        biometricButtonRef.current?.focus();
+        break;
+      // Additional elements can be focused programmatically
+    }
+  };
+
+  const handleElementActivation = (elementId: string) => {
+    triggerHapticFeedback.light();
+    
+    switch (elementId) {
+      case 'authMethodPin':
+        setAuthMethod('pin');
+        break;
+      case 'authMethodBiometric':
+        setAuthMethod('biometric');
+        break;
+      case 'rememberDevice':
+        setRememberDevice(!rememberDevice);
+        break;
+      case 'login':
+        handleLogin();
+        break;
+      case 'biometricAuth':
+        handleBiometricAuth();
+        break;
+      case 'forgotCredentials':
+        handleForgotCredentials();
+        break;
+      case 'signUp':
+        navigation.navigate('SignUp');
+        break;
+    }
+  };
+
+  const handleEscape = () => {
+    setFocusedElement(null);
+    // Clear any focused element
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -277,6 +609,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.subtitle}>
               We've missed you. Let's continue your wellness journey.
             </Text>
+            {lastLoginTime && (
+              <Text style={styles.lastLoginText}>
+                Last login: {lastLoginTime}
+              </Text>
+            )}
           </View>
           
           {/* Security Indicator */}
@@ -290,9 +627,24 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
         {/* Enhanced Login Form Card */}
         <View style={styles.formCard}>
+          {/* Accessibility Live Region for Voice Announcements */}
+          {liveRegionMessage !== '' && (
+            <Text
+              style={styles.accessibilityLiveRegion}
+              accessibilityLiveRegion="assertive"
+              accessibilityRole="alert"
+            >
+              {liveRegionMessage}
+            </Text>
+          )}
+
           {/* Rate Limiting Warning */}
           {isBlocked && (
-            <View style={styles.warningBanner}>
+            <View 
+              style={styles.warningBanner}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
               <Icon name="warning" size={20} color={COLORS.warning500} />
               <Text style={styles.warningText}>
                 Account temporarily locked. Try again in {blockTimeRemaining}s
@@ -305,18 +657,26 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.inputHeader}>
               <Icon name="phone" size={20} color={COLORS.secondary600} />
               <Text style={styles.inputLabel}>Phone Number</Text>
+              {detectedCountry === 'US' && phoneNumber.length > 0 && (
+                <View style={styles.countryIndicator}>
+                  <Text style={styles.countryFlag}>🇺🇸</Text>
+                  <Text style={styles.countryCode}>+1</Text>
+                </View>
+              )}
             </View>
             <TextInput
-              placeholder="0712 345 678"
+              placeholder="(555) 123-4567"
               value={phoneNumber}
               onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
               keyboardType="phone-pad"
-              maxLength={12}
+              maxLength={18}
               errorText={errors.phoneNumber}
               leftIcon="call"
-              rightIcon={phoneNumber.length >= 10 ? "check-circle" : undefined}
+              rightIcon={phoneNumber.replace(/\D/g, '').replace(/^1/, '').length === 10 ? "check-circle" : undefined}
               accessibilityLabel="Enter your registered phone number"
-              accessibilityHint="Enter the phone number you used to register your account"
+              accessibilityHint="Enter the phone number you used to register your account. US format with automatic formatting"
+              ref={phoneInputRef}
+              onKeyPress={(event) => handleKeyPress(event, 'phoneNumber')}
             />
           </View>
 
@@ -329,10 +689,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                   styles.authMethodButton,
                   authMethod === 'pin' && styles.authMethodButtonActive
                 ]}
-                onPress={() => setAuthMethod('pin')}
+                onPress={() => {
+                  triggerHapticFeedback.light();
+                  setAuthMethod('pin');
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Sign in with 4-digit PIN"
                 accessibilityState={{ selected: authMethod === 'pin' }}
+                onKeyPress={(event) => handleKeyPress(event, 'authMethodPin')}
               >
                 <Icon name="dialpad" size={16} color={authMethod === 'pin' ? COLORS.secondary600 : COLORS.gray600} style={{ marginRight: 4 }} />
                 <Text style={[
@@ -347,10 +711,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                     styles.authMethodButton,
                     authMethod === 'biometric' && styles.authMethodButtonActive
                   ]}
-                  onPress={() => setAuthMethod('biometric')}
+                  onPress={() => {
+                    triggerHapticFeedback.light();
+                    setAuthMethod('biometric');
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={`Sign in with ${biometricDescription}`}
                   accessibilityState={{ selected: authMethod === 'biometric' }}
+                  onKeyPress={(event) => handleKeyPress(event, 'authMethodBiometric')}
                 >
                   <Icon name="fingerprint" size={16} color={authMethod === 'biometric' ? COLORS.secondary600 : COLORS.gray600} style={{ marginRight: 4 }} />
                   <Text style={[
@@ -370,6 +738,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.inputLabel}>4-Digit PIN</Text>
               </View>
               <TextInput
+                ref={pinInputRef}
                 placeholder="Enter your secure PIN"
                 value={pin}
                 onChangeText={setPin}
@@ -378,11 +747,12 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 maxLength={6}
                 errorText={errors.pin}
                 leftIcon="lock"
-                rightIcon={showPassword ? "visibility" : "visibility-off"}
+                rightIcon={pin.length >= 4 ? "check-circle" : showPassword ? "visibility" : "visibility-off"}
                 onRightIconPress={() => setShowPassword(!showPassword)}
                 helperText="Must be at least 4 digits with a number"
                 accessibilityLabel="Enter your 4-digit PIN"
                 accessibilityHint="Your secure PIN for authentication"
+                onKeyPress={(event) => handleKeyPress(event, 'pin')}
               />
             </View>
           )}
@@ -390,16 +760,20 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           {/* Biometric Authentication */}
           {authMethod === 'biometric' && (
             <View style={styles.biometricContainer}>
-              <IconButton
-                icon="fingerprint"
-                iconLibrary="MaterialIcons"
-                variant="primary"
-                size="extra-large"
-                onPress={handleBiometricAuth}
-                style={styles.biometricButton}
-                accessibilityLabel={`Use ${biometricDescription} to authenticate`}
-                disabled={isBlocked}
-              />
+              <Animated.View style={[{ transform: [{ scale: pulseAnim }] }]}>
+                <IconButton
+                  icon="fingerprint"
+                  iconLibrary="MaterialIcons"
+                  variant="primary"
+                  size="extra-large"
+                  onPress={handleBiometricAuth}
+                  style={styles.biometricButton}
+                  accessibilityLabel={`Use ${biometricDescription} to authenticate`}
+                  disabled={isBlocked}
+                  ref={biometricButtonRef}
+                  onKeyPress={(event) => handleKeyPress(event, 'biometricAuth')}
+                />
+              </Animated.View>
               <Text style={styles.biometricText}>
                 Touch the sensor to authenticate with {biometricDescription}
               </Text>
@@ -412,14 +786,40 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           {/* Forgot Credentials */}
           <TouchableOpacity
             style={styles.forgotButton}
-            onPress={handleForgotCredentials}
+            onPress={() => {
+              triggerHapticFeedback.light();
+              handleForgotCredentials();
+            }}
             accessibilityRole="button"
             accessibilityLabel="Reset your login credentials"
+            onKeyPress={(event) => handleKeyPress(event, 'forgotCredentials')}
           >
             <Text style={styles.forgotText}>
               Forgot your credentials? Reset here
             </Text>
           </TouchableOpacity>
+
+          {/* Remember Device Checkbox */}
+          <View style={styles.rememberDeviceContainer}>
+            <TouchableOpacity
+              style={styles.checkboxContainer}
+              onPress={() => {
+                triggerHapticFeedback.light();
+                setRememberDevice(!rememberDevice);
+              }}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: rememberDevice }}
+              accessibilityLabel="Remember this device for faster future logins"
+              onKeyPress={(event) => handleKeyPress(event, 'rememberDevice')}
+            >
+              <View style={[styles.checkbox, rememberDevice && styles.checkboxChecked]}>
+                {rememberDevice && <Icon name="check" size={16} color={COLORS.white} />}
+              </View>
+              <Text style={styles.rememberDeviceText}>
+                Remember this device for 30 days
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Login Button */}
           <Button
@@ -429,12 +829,17 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             disabled={isBlocked || !phoneNumber || (authMethod === 'pin' && pin.length < 4)}
             style={styles.loginButton}
             accessibilityLabel="Sign in to your account"
+            ref={loginButtonRef}
+            onKeyPress={(event) => handleKeyPress(event, 'login')}
           />
 
           {/* Support Link */}
           <TouchableOpacity 
             style={styles.supportLink}
-            onPress={() => Linking.openURL('https://afya360.com/support')}
+            onPress={() => {
+              triggerHapticFeedback.light();
+              Linking.openURL('https://afya360.com/support');
+            }}
             accessibilityLabel="Get help and support"
             accessibilityRole="button"
           >
@@ -449,7 +854,10 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           
           <TouchableOpacity 
             style={styles.quickActionButton}
-            onPress={handleEmergencyAccess}
+            onPress={() => {
+              triggerHapticFeedback.medium();
+              handleEmergencyAccess();
+            }}
             accessibilityLabel="Emergency access to critical health information"
             accessibilityRole="button"
           >
@@ -467,7 +875,10 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               Don't have an account?
             </Text>
             <TouchableOpacity 
-              onPress={() => navigation.navigate('SignUp')}
+              onPress={() => {
+                triggerHapticFeedback.light();
+                navigation.navigate('SignUp');
+              }}
               style={styles.createAccountButton}
               accessibilityLabel="Create a new account"
               accessibilityRole="button"
@@ -515,6 +926,15 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
+  },
+  
+  // Accessibility
+  accessibilityLiveRegion: {
+    position: 'absolute',
+    left: -10000,
+    width: 1,
+    height: 1,
+    overflow: 'hidden',
   },
   
   // Enhanced Header Section - Medical Green Theme
@@ -565,6 +985,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 22,
     fontSize: 16,
+  },
+  lastLoginText: {
+    ...TEXT_STYLES.caption,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    fontSize: 12,
+    fontStyle: 'italic',
   },
   securityBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -634,6 +1061,27 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '700',
     fontSize: 16,
+  },
+  countryIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    backgroundColor: COLORS.secondary50,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.secondary200,
+  },
+  countryFlag: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  countryCode: {
+    ...TEXT_STYLES.caption,
+    color: COLORS.secondary600,
+    fontWeight: '600',
+    fontSize: 12,
   },
 
   authMethodContainer: {
@@ -859,6 +1307,38 @@ const styles = StyleSheet.create({
     ...TEXT_STYLES.caption,
     color: COLORS.gray400,
     fontSize: 12,
+  },
+
+  // Remember Device Checkbox
+  rememberDeviceContainer: {
+    marginBottom: 20,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.gray400,
+    backgroundColor: COLORS.white,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.secondary500,
+    borderColor: COLORS.secondary500,
+  },
+  rememberDeviceText: {
+    ...TEXT_STYLES.body,
+    color: COLORS.gray700,
+    fontSize: 14,
+    flex: 1,
   },
 });
 
